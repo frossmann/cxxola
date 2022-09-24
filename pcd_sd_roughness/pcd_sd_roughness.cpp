@@ -87,24 +87,37 @@ int main(int argc, char **argv)
         // search radius
         if (octree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
         {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+            // iterate through each neighbouring point in the and push_back the
+            // cluster
+            for (std::size_t i = 0; i < pointIdxRadiusSearch, ++i)
+            {
+                cloud_cluster->points.push_back(cloud->points[pointIdxRadiusSearch]);
+            }
+            cloud_cluster->width = cloud_cluster->points.size();
+            cloud_cluster->height = 1;
+            cloud_cluster->is_dense = true;
+
             std::vector<float> radii;
             for (int jj = 0; jj < pointIdxRadiusSearch.size(); jj++)
             {
-                radii.push_back(std::sqrt(cloud->points[jj].x * cloud->points[jj].x + cloud->points[jj].y * cloud->points[jj].y + cloud->points[jj].z * cloud->points[jj].z));
+                radii.push_back(std::sqrt(cloud_cluster->points[jj].x * cloud_cluster->points[jj].x +
+                                          cloud_cluster->points[jj].y * cloud_cluster->points[jj].y +
+                                          cloud_cluster->points[jj].z * cloud_cluster->points[jj].z));
             }
 
             float radii_sum = std::accumulate(radii.begin(), radii.end(),
                                               decltype(radii)::value_type(0));
 
             float radii_mean = radii_sum / pointIdxRadiusSearch.size();
-            std::cout << "mean of radial values: " << radii_sum << std::endl;
+            std::cout << "mean of radial values: " << radii_mean << std::endl;
             // intensity.push_back(std::sqrt(radii));
 
-            for (std::size_t i = 0; i < pointIdxRadiusSearch.size(); ++i)
-                std::cout << "    " << (*cloud)[pointIdxRadiusSearch[i]].x
-                          << " " << (*cloud)[pointIdxRadiusSearch[i]].y
-                          << " " << (*cloud)[pointIdxRadiusSearch[i]].z
-                          << " (squared distance: " << pointRadiusSquaredDistance[i] << ")" << std::endl;
+            // for (std::size_t i = 0; i < pointIdxRadiusSearch.size(); ++i)
+            //     std::cout << "    " << (*cloud)[pointIdxRadiusSearch[i]].x
+            //               << " " << (*cloud)[pointIdxRadiusSearch[i]].y
+            //               << " " << (*cloud)[pointIdxRadiusSearch[i]].z
+            //               << " (squared distance: " << pointRadiusSquaredDistance[i] << ")" << std::endl;
         }
         // print short message
         std::cout << "N points found in search: " << pointIdxRadiusSearch.size() << std::endl;
