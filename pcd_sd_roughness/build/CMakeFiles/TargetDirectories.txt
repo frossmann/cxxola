@@ -1,0 +1,3 @@
+/Users/francis/repos/cxxola/pcd_sd_roughness/build/CMakeFiles/pcd_sd_roughness.dir
+/Users/francis/repos/cxxola/pcd_sd_roughness/build/CMakeFiles/edit_cache.dir
+/Users/francis/repos/cxxola/pcd_sd_roughness/build/CMakeFiles/rebuild_cache.dir
