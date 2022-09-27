@@ -4,7 +4,9 @@
 #include <pcl/octree/octree_search.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/features/normal_3d.h>
 #include <cmath>
+#include <chrono>
 
 #include <iostream>
 #include <vector>
@@ -13,6 +15,8 @@
 
 int main(int argc, char **argv)
 {
+    // start a timer
+    auto start = std::chrono::high_resolution_clock::now();
     // set data-type XYZI as name PointT
     typedef pcl::PointXYZI PointT;
 
@@ -73,7 +77,7 @@ int main(int argc, char **argv)
 
     // pcl::PointCloud<PointT>::Ptr cloud_down_ptr;
     // for (int ii = 0; ii < cloud_down->points.size(); ii++)
-    for (int ii = 0; ii < 5; ii++)
+    for (int ii = 0; ii < cloud_down->points.size(); ii++)
     {
         // std::cout << point.x << "  " << point.y << "  " << point.z << std::endl;
         searchPoint.x = cloud_down->points[ii].x;
@@ -81,63 +85,76 @@ int main(int argc, char **argv)
         searchPoint.z = cloud_down->points[ii].z;
 
         // print start conditions:
-        std::cout << "Neighbors within radius search at (" << searchPoint.x
-                  << " " << searchPoint.y
-                  << " " << searchPoint.z
-                  << ") with radius=" << radius << std::endl;
-        std::vector<double> intensity;
+        // std::cout << "Neighbors within radius search at (" << searchPoint.x
+        //           << " " << searchPoint.y
+        //           << " " << searchPoint.z
+        //           << ") with radius=" << radius << std::endl;
+        // std::vector<double> intensity;
         // do the search with the octree for neighbouring points in the
         // search radius
         if (octree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
         {
-            std::cout << pointIdxRadiusSearch.size() << " neighbours found." << std::endl;
+            // std::cout << pointIdxRadiusSearch.size() << " neighbours found." << std::endl;
 
-            // make a vector to hold radial values of neighbouring points:
-            std::vector<float> radii;
-            for (int jj = 0; jj < pointIdxRadiusSearch.size(); jj++)
-            {
-                radii.push_back(std::sqrt(std::pow(cloud->points[jj].x, 2) +
-                                          std::pow(cloud->points[jj].y, 2) +
-                                          std::pow(cloud->points[jj].z, 2)));
-            }
+            // // make a vector to hold radial values of neighbouring points:
+            // std::vector<float> radii;
+            // for (int jj = 0; jj < pointIdxRadiusSearch.size(); jj++)
+            // {
+            //     radii.push_back(std::sqrt(std::pow(cloud->points[jj].x, 2) +
+            //                               std::pow(cloud->points[jj].y, 2) +
+            //                               std::pow(cloud->points[jj].z, 2)));
+            // }
 
-            // declare variables for sum, mean of radial points
-            double sum = std::accumulate(radii.begin(), radii.end(), 0.0);
-            double mean = sum / pointIdxRadiusSearch.size();
+            // // declare variables for sum, mean of radial points
+            // double sum = std::accumulate(radii.begin(), radii.end(), 0.0);
+            // double mean = sum / pointIdxRadiusSearch.size();
 
-            // calculate the square sum and standard deviation of radii
-            std::vector<double> diff(radii.size());
-            std::transform(radii.begin(), radii.end(), diff.begin(), [mean](double x)
-                           { return x - mean; });
-            double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
-            double stdev = std::sqrt(sq_sum / radii.size());
+            // // calculate the square sum and standard deviation of radii
+            // std::vector<double> diff(radii.size());
+            // std::transform(radii.begin(), radii.end(), diff.begin(), [mean](double x)
+            //                { return x - mean; });
+            // double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+            // double stdev = std::sqrt(sq_sum / radii.size());
 
-            std::cout << "    mean of radial values: " << mean << std::endl;
-            std::cout << "    square sum of radial values: " << sq_sum << std::endl;
-            std::cout << "    st. dev. of radial values: " << stdev << std::endl;
+            // std::cout << "    mean of radial values: " << mean << std::endl;
+            // std::cout << "    square sum of radial values: " << sq_sum << std::endl;
+            // std::cout << "    st. dev. of radial values: " << stdev << std::endl;
 
             // do orthogonal distance regression:
             // set up an object to hold the cloud cluster:
             // also initialize an extractor:
-            pcl::PointIndices::Ptr neighbourIndices(new pcl::PointIndices);
+            // pcl::PointIndices::Ptr neighbourIndices(new pcl::PointIndices);
 
-            neighbourIndices->indices = pointIdxRadiusSearch;
+            // neighbourIndices->indices = pointIdxRadiusSearch;
 
-            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
-            pcl::ExtractIndices<pcl::PointXYZ> extract;
-            extract.setInputCloud(cloud);
-            extract.setIndices(neighbourIndices);
-            extract.setNegative(false); // true
-            extract.filter(*cloud_cluster);
+            // extract cluster into own object
+            // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+            // pcl::ExtractIndices<pcl::PointXYZ> extract;
+            // extract.setInputCloud(cloud);
+            // extract.setIndices(neighbourIndices);
+            // extract.setNegative(false); // true
+            // extract.filter(*cloud_cluster);
 
-            std::cout << "Cloud cluster contains : " << cloud_cluster->height * cloud_cluster->width << " points." << std::endl;
+            // std::cout << "Cloud cluster contains : " << cloud_cluster->height * cloud_cluster->width << " points." << std::endl;
 
-            // Placeholder for 3x3 covariance matrix for each patch:
-            Eigen::Matrix3f covariance_matrix;
-            // 16-bytes alinged placeholder for the XYZ centroid of the surface patcg
-            Eigen::Vector4f xyz_centroid;
+            // create a normal estimation class and pass the cloud cluster
+            // to it:
+            Eigen::Vector4f plane_parameters;
+            float curvature;
+            // pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+            pcl::computePointNormal(*cloud, pointIdxRadiusSearch, plane_parameters, curvature);
+            const char *pconst[4] = {"nx", "ny", "nz", "r"};
+
+            // std::cout << "Plane parameters: " << std::endl;
+            // for (int kk = 0; kk < plane_parameters.size(); kk++)
+            // {
+            //     std::cout << "    " << pconst[kk] << ": " << plane_parameters[kk] << std::endl;
+            // }
         }
+        // std::cout << std::endl;
     }
-
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+    std::cout << duration.count() << std::endl;
     return 0;
 }
