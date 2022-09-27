@@ -2,9 +2,11 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/octree/octree_search.h>
+#include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/features/normal_3d.h>
+#include <pcl/common/pca.h>
 #include <cmath>
 #include <chrono>
 
@@ -17,7 +19,8 @@ int main(int argc, char **argv)
 {
     // start a timer
     auto start = std::chrono::high_resolution_clock::now();
-    // set data-type XYZI as name PointT
+
+    // set data-type XYZI as name PointT (not implemented later)
     typedef pcl::PointXYZI PointT;
 
     // parse arguments:
@@ -47,36 +50,39 @@ int main(int argc, char **argv)
     voxel_grid.filter(*cloud_down);
 
     // print downsampled pointcloud size
-    std::cout << "After downsampling: " << cloud_down->height * cloud_down->width << " points" << std::endl;
+    std::cout << "After downsampling: " << cloud_down->height * cloud_down->width << " points" << std::endl
+              << std::endl;
 
-    // set resolution of octree (1m here)
-    float resolution = 0.001f;
+    // set resolution of octree (10cm here).
+    // float resolution = 0.0001f;
+    // // initialize the octree
+    // pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree(resolution);
+    // // add pointcloud cloud to octree
+    // octree.setInputCloud(cloud);
+    // octree.addPointsFromInputCloud();
 
-    // initialize the octree
-    pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree(resolution);
-
-    // add pointcloud cloud to octree
-    octree.setInputCloud(cloud);
-    octree.addPointsFromInputCloud();
+    // initialize the kd-tree
+    pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+    kdtree.setInputCloud(cloud);
 
     // pick the 500th point to do a neighbour search about
     // int index = 500;
 
     // initialize and populate the search point
     pcl::PointXYZ searchPoint;
-    // searchPoint.x = cloud->points[index].x;
-    // searchPoint.y = cloud->points[index].y;
-    // searchPoint.z = cloud->points[index].z;
 
     // initialize for neighbors within radius search
     std::vector<int> pointIdxRadiusSearch;
     std::vector<float> pointRadiusSquaredDistance;
 
     // set search radius to 5m
-    float radius = 0.005;
+    float radius = 0.001;
 
-    // pcl::PointCloud<PointT>::Ptr cloud_down_ptr;
-    // for (int ii = 0; ii < cloud_down->points.size(); ii++)
+    // Loop through each node point in 'cloud_down' and
+    // search for it's nearest neighbours within the specified
+    // search radius:
+
+    // for (int ii = 0; ii < 3; ii++)
     for (int ii = 0; ii < cloud_down->points.size(); ii++)
     {
         // std::cout << point.x << "  " << point.y << "  " << point.z << std::endl;
@@ -89,10 +95,12 @@ int main(int argc, char **argv)
         //           << " " << searchPoint.y
         //           << " " << searchPoint.z
         //           << ") with radius=" << radius << std::endl;
-        // std::vector<double> intensity;
+
         // do the search with the octree for neighbouring points in the
         // search radius
-        if (octree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
+        // if (octree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
+        // {
+        if (kdtree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
         {
             // std::cout << pointIdxRadiusSearch.size() << " neighbours found." << std::endl;
 
@@ -123,38 +131,44 @@ int main(int argc, char **argv)
             // do orthogonal distance regression:
             // set up an object to hold the cloud cluster:
             // also initialize an extractor:
-            // pcl::PointIndices::Ptr neighbourIndices(new pcl::PointIndices);
-
-            // neighbourIndices->indices = pointIdxRadiusSearch;
+            pcl::PointIndices::Ptr neighbourIndices(new pcl::PointIndices);
+            neighbourIndices->indices = pointIdxRadiusSearch;
 
             // extract cluster into own object
-            // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
-            // pcl::ExtractIndices<pcl::PointXYZ> extract;
-            // extract.setInputCloud(cloud);
-            // extract.setIndices(neighbourIndices);
-            // extract.setNegative(false); // true
-            // extract.filter(*cloud_cluster);
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::ExtractIndices<pcl::PointXYZ> extract;
+            extract.setInputCloud(cloud);
+            extract.setIndices(neighbourIndices);
+            extract.setNegative(false); // true
+            extract.filter(*cloud_cluster);
 
             // std::cout << "Cloud cluster contains : " << cloud_cluster->height * cloud_cluster->width << " points." << std::endl;
 
-            // create a normal estimation class and pass the cloud cluster
-            // to it:
-            Eigen::Vector4f plane_parameters;
-            float curvature;
-            // pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-            pcl::computePointNormal(*cloud, pointIdxRadiusSearch, plane_parameters, curvature);
-            const char *pconst[4] = {"nx", "ny", "nz", "r"};
-
+            // test pcl::computePointNormal common method:
+            // Note this seems slow. A pointer to the entire search cloud gets passed in,
+            // maybe this is causing unnecessary overhead?
+            // Eigen::Vector4f plane_parameters;
+            // float curvature;
+            // pcl::computePointNormal(*cloud_cluster, plane_parameters, curvature);
+            // const char *pconst[4] = {"nx", "ny", "nz", "r"};
             // std::cout << "Plane parameters: " << std::endl;
             // for (int kk = 0; kk < plane_parameters.size(); kk++)
             // {
             //     std::cout << "    " << pconst[kk] << ": " << plane_parameters[kk] << std::endl;
             // }
+            // std::cout << std::endl;
+
+            // calculate the cloud_cluster point normal PCA:
+            Eigen::Matrix3f eigenvectors;
+            pcl::PCA<pcl::PointXYZ> pca(new pcl::PCA<pcl::PointXYZ>);
+            pca.setInputCloud(cloud_cluster);
+            eigenvectors = pca.getEigenVectors();
+            // std::cout << eigenvectors << std::endl;
         }
         // std::cout << std::endl;
     }
     auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-    std::cout << duration.count() << std::endl;
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    std::cout << "Elapsed time in microseconds: " << duration.count() << std::endl;
     return 0;
 }
